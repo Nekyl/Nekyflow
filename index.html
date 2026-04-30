@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nekyflow</title>
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/style.css?v=11">
+</head>
+<body>
+  <header class="header" id="header">
+    <a class="logo" id="logo">NEKYFLOW</a>
+    <nav class="nav-tabs" id="navTabs">
+      <button class="nav-tab active" data-page="home">Início</button>
+      <button class="nav-tab" data-page="movies">Filmes</button>
+      <button class="nav-tab" data-page="tv">Séries</button>
+      <button class="nav-tab" data-page="animation">Animação</button>
+      <button class="nav-tab" data-page="favorites">Favoritos</button>
+      <button class="nav-tab" data-page="watchlist">Minha Lista</button>
+    </nav>
+    <div class="genres-dropdown" id="genresDropdown">
+      <button class="nav-tab genres-toggle" id="genresToggle">
+        Gêneros <svg class="genres-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="genres-panel hidden" id="genresPanel">
+        <div class="genres-column" id="genresMovie"></div>
+        <div class="genres-column" id="genresTV"></div>
+      </div>
+    </div>
+    <div class="search-container">
+      <span class="search-icon"><svg class="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+      <input class="search-input" id="searchInput" type="text" placeholder="Buscar filmes, séries...">
+    </div>
+  </header>
+
+  <main class="main-content" id="mainContent">
+    <!-- Dynamic content rendered here by app.js -->
+  </main>
+
+  <div id="modalRoot"></div>
+  <div id="playerRoot"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script>window.TMDB_API_KEY='afab74fbe1290b56524bd47edb9eaca9';</script>
+  <script src="js/config.js?v=4"></script>
+  <script src="js/api.js?v=5"></script>
+  <script src="js/ui.js?v=4"></script>
+  <script src="js/player.js?v=4"></script>
+  <script src="js/app.js?v=5"></script>
+  <style>
+    #installBtn {
+      display: none;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 9999;
+      padding: 12px 24px;
+      background: var(--gold, #D4A746);
+      color: var(--bg-primary, #0a0a0a);
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(212,167,70,0.4);
+    }
+    #installBtn:hover { background: var(--gold-light, #E8C36A); }
+  </style>
+  <button id="installBtn">Instalar App</button>
+  <script>
+    let deferredPrompt;
+    const installBtn = document.getElementById('installBtn');
+
+    // Não mostra botão se já está rodando como app instalado
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+
+    if (!isStandalone && 'serviceWorker' in navigator) {
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        installBtn.style.display = 'block';
+      });
+    }
+
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        installBtn.style.display = 'none';
+      }
+      deferredPrompt = null;
+    });
+  </script>
+</body>
+</html>
