@@ -161,7 +161,8 @@ const APP = {
 
   async renderAnimation() {
     const main = document.getElementById('mainContent'); main.innerHTML = '';
-    try { const t = await API.getTrending('all', 'week'); const kidsOnly = t.filter(i => i.genre_ids?.includes(16) && !['ja','zh','ko'].includes(i.original_language)); if (kidsOnly.length > 0) main.appendChild(UI.createRow('Kids em Alta', kidsOnly, 'row-kids-trending')); } catch {}
+    try { const a = await API.getKidsTrending(); main.appendChild(UI.createRow('Kids em Alta', a, 'row-kids-trending')); } catch {}
+    try { const a = await API.getKidsTrendingMovies(); main.appendChild(UI.createRow('Lançamentos Kids', a, 'row-kids-new-movies')); } catch {}
     try { const a = await API.getKidsAnimationMovies(); main.appendChild(UI.createRow('Filmes de Animação', a, 'row-kids-movies')); } catch {}
     try { const a = await API.getKidsAnimationTV(); main.appendChild(UI.createRow('Séries de Animação', a, 'row-kids-tv')); } catch {}
     try { const a = await API.getTopRatedKidsMovies(); main.appendChild(UI.createRow('Animações Aclamadas', a, 'row-kids-top-movies')); } catch {}
@@ -176,7 +177,7 @@ const APP = {
 
   async renderAnimes() {
     const main = document.getElementById('mainContent'); main.innerHTML = '';
-    try { const t = await API.getTrending('all', 'week'); const animeOnly = t.filter(i => i.genre_ids?.includes(16) && ['ja','zh','ko'].includes(i.original_language)); if (animeOnly.length > 0) main.appendChild(UI.createRow('Animes em Alta', animeOnly, 'row-anime-trending')); } catch {}
+    try { const a = await API.getAnimeTrendingTV(); main.appendChild(UI.createRow('Animes em Alta', a, 'row-anime-trending')); } catch {}
     try { const a = await API.getAnimeTV(); main.appendChild(UI.createRow('Animes Populares', a, 'row-anime-popular-tv')); } catch {}
     try { const a = await API.getAnimeMovies(); main.appendChild(UI.createRow('Filmes de Anime', a, 'row-anime-movies')); } catch {}
     try { const a = await API.getTopRatedAnimeTV(); main.appendChild(UI.createRow('Animes Mais Bem Avaliados', a, 'row-anime-top-tv')); } catch {}
@@ -192,8 +193,9 @@ const APP = {
 
   async renderDoramas() {
     const main = document.getElementById('mainContent'); main.innerHTML = '';
-    try { const t = await API.getTrending('tv', 'week'); const doramaOnly = t.filter(i => i.genre_ids?.includes(18) && ['ja','zh','ko'].includes(i.original_language)); if (doramaOnly.length > 0) main.appendChild(UI.createRow('Doramas em Alta', doramaOnly, 'row-dorama-trending')); } catch {}
+    try { const d = await API.getDoramaTrendingTV(); main.appendChild(UI.createRow('Doramas em Alta', d, 'row-dorama-trending')); } catch {}
     try { const d = await API.getDoramaTV(); main.appendChild(UI.createRow('Doramas Populares', d, 'row-dorama-popular-tv')); } catch {}
+    try { const d = await API.getDoramaNowAiring(); main.appendChild(UI.createRow('Exibindo Agora', d, 'row-dorama-airing')); } catch {}
     try { const d = await API.getTopRatedDoramaTV(); main.appendChild(UI.createRow('Doramas Mais Bem Avaliados', d, 'row-dorama-top')); } catch {}
     try { const d = await API.getKoreanDoramaTV(); main.appendChild(UI.createRow('K-Dramas', d, 'row-dorama-kr')); } catch {}
     try { const d = await API.getJapaneseDoramaTV(); main.appendChild(UI.createRow('J-Dramas', d, 'row-dorama-jp')); } catch {}

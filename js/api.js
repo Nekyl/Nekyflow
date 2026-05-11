@@ -294,9 +294,12 @@ const API = {
   },
 
   async getAnimeNowAiring(page = 1) {
-    const data = await this._fetch('/tv/on_the_air', {
+    const data = await this._fetch('/discover/tv', {
       with_genres: '16',
       with_original_language: 'ja|zh|ko',
+      sort_by: 'popularity.desc',
+      'air_date.gte': new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().split('T')[0],
+      'air_date.lte': new Date().toISOString().split('T')[0],
       page,
     });
     return data.results;
@@ -332,6 +335,17 @@ const API = {
     return data.results;
   },
 
+  async getAnimeTrendingTV(page = 1) {
+    const data = await this._fetch('/discover/tv', {
+      with_genres: '16',
+      with_original_language: 'ja|zh|ko',
+      sort_by: 'popularity.desc',
+      'air_date.gte': new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString().split('T')[0],
+      page,
+    });
+    return data.results;
+  },
+
   async getKoreanAnimeTV(page = 1) {
     const data = await this._fetch('/discover/tv', {
       with_genres: '16',
@@ -357,6 +371,29 @@ const API = {
       with_genres: '16,10759',
       with_original_language: 'ja|zh|ko',
       sort_by: 'popularity.desc',
+      page,
+    });
+    return data.results;
+  },
+
+  async getDoramaTrendingTV(page = 1) {
+    const data = await this._fetch('/discover/tv', {
+      with_genres: '18',
+      with_original_language: 'ja|zh|ko',
+      sort_by: 'popularity.desc',
+      'air_date.gte': new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString().split('T')[0],
+      page,
+    });
+    return data.results;
+  },
+
+  async getDoramaNowAiring(page = 1) {
+    const data = await this._fetch('/discover/tv', {
+      with_genres: '18',
+      with_original_language: 'ja|zh|ko',
+      sort_by: 'popularity.desc',
+      'air_date.gte': new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().split('T')[0],
+      'air_date.lte': new Date().toISOString().split('T')[0],
       page,
     });
     return data.results;
@@ -430,6 +467,28 @@ const API = {
       with_genres: '18,10749',
       with_original_language: 'ja|zh|ko',
       sort_by: 'popularity.desc',
+      page,
+    });
+    return data.results;
+  },
+
+  async getKidsTrending(page = 1) {
+    const data = await this._fetch('/discover/tv', {
+      with_genres: '16',
+      with_original_language: 'en|pt|es|fr|de|it',
+      sort_by: 'popularity.desc',
+      'air_date.gte': new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString().split('T')[0],
+      page,
+    });
+    return data.results;
+  },
+
+  async getKidsTrendingMovies(page = 1) {
+    const data = await this._fetch('/discover/movie', {
+      with_genres: '16',
+      with_original_language: 'en|pt|es|fr|de|it',
+      sort_by: 'popularity.desc',
+      'primary_release_date.gte': new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().split('T')[0],
       page,
     });
     return data.results;
