@@ -617,6 +617,7 @@ const APP = {
   navigateTo(page, params = {}) {
     this.currentPage = page;
     document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.page === page));
+    document.querySelectorAll('.mobile-nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.page === page));
     this.closeGenres();
     switch (page) {
       case 'home': this.renderHome(); break; case 'movies': this.renderMovies(); break;
@@ -671,6 +672,7 @@ const APP = {
 
 
     document.querySelectorAll('.nav-tab:not(.genres-toggle)').forEach(tab => tab.addEventListener('click', () => this.navigateTo(tab.dataset.page)));
+    document.querySelectorAll('.mobile-nav-item').forEach(btn => btn.addEventListener('click', () => this.navigateTo(btn.dataset.page)));
     this.setupGenresToggle(); this.initGenres();
     document.getElementById('logo').addEventListener('click', () => this.navigateTo('home'));
 
