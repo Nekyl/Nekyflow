@@ -108,6 +108,20 @@ const API = {
     return data.results;
   },
 
+  async getTVDetails(tvId) {
+    const cacheKey = `tv_details_${tvId}`;
+    const cached = this._cacheGet(cacheKey);
+    if (cached) return cached;
+    const data = await this._fetch(`/tv/${tvId}`, {}, 'details');
+    this._cacheSet(cacheKey, data, this.CACHE_TTL.details);
+    return data;
+  },
+
+  async getTVDetailsBatch(tvIds) {
+    const results = await Promise.all(tvIds.map(id => this.getTVDetails(id).catch(() => null)));
+    return results.filter(Boolean);
+  },
+
   // === Genres ===
 
   async getGenres(type = 'movie') {
@@ -172,34 +186,6 @@ const API = {
     return all;
   },
 
-  // Fetch ALL pages for a genre (max 5 to avoid rate limits)
-  async getAllMoviesByGenre(genreId, maxPages = 5) {
-    let allResults = [];
-    for (let page = 1; page <= maxPages; page++) {
-      const data = await this._fetch('/discover/movie', {
-        with_genres: genreId,
-        sort_by: 'popularity.desc',
-        page,
-      });
-      allResults = allResults.concat(data.results);
-      if (page >= data.total_pages) break;
-    }
-    return allResults;
-  },
-
-  async getAllTVByGenre(genreId, maxPages = 5) {
-    let allResults = [];
-    for (let page = 1; page <= maxPages; page++) {
-      const data = await this._fetch('/discover/tv', {
-        with_genres: genreId,
-        sort_by: 'popularity.desc',
-        page,
-      });
-      allResults = allResults.concat(data.results);
-      if (page >= data.total_pages) break;
-    }
-    return allResults;
-  },
 
   // === By Language/Region ===
 
@@ -379,6 +365,7 @@ const API = {
   async getDoramaTrendingTV(page = 1) {
     const data = await this._fetch('/discover/tv', {
       with_genres: '18',
+      without_genres: '16',
       with_original_language: 'ja|zh|ko',
       sort_by: 'popularity.desc',
       'air_date.gte': new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString().split('T')[0],
@@ -390,6 +377,7 @@ const API = {
   async getDoramaNowAiring(page = 1) {
     const data = await this._fetch('/discover/tv', {
       with_genres: '18',
+      without_genres: '16',
       with_original_language: 'ja|zh|ko',
       sort_by: 'popularity.desc',
       'air_date.gte': new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().split('T')[0],
@@ -404,6 +392,7 @@ const API = {
   async getDoramaTV(page = 1) {
     const data = await this._fetch('/discover/tv', {
       with_genres: '18',
+      without_genres: '16',
       with_original_language: 'ja|zh|ko',
       sort_by: 'popularity.desc',
       page,
@@ -414,6 +403,7 @@ const API = {
   async getDoramaMovies(page = 1) {
     const data = await this._fetch('/discover/movie', {
       with_genres: '18',
+      without_genres: '16',
       with_original_language: 'ja|zh|ko',
       sort_by: 'popularity.desc',
       page,
@@ -424,6 +414,7 @@ const API = {
   async getTopRatedDoramaTV(page = 1) {
     const data = await this._fetch('/discover/tv', {
       with_genres: '18',
+      without_genres: '16',
       with_original_language: 'ja|zh|ko',
       sort_by: 'vote_average.desc',
       'vote_count.gte': 20,
@@ -435,6 +426,7 @@ const API = {
   async getKoreanDoramaTV(page = 1) {
     const data = await this._fetch('/discover/tv', {
       with_genres: '18',
+      without_genres: '16',
       with_original_language: 'ko',
       sort_by: 'popularity.desc',
       page,
@@ -445,6 +437,7 @@ const API = {
   async getJapaneseDoramaTV(page = 1) {
     const data = await this._fetch('/discover/tv', {
       with_genres: '18',
+      without_genres: '16',
       with_original_language: 'ja',
       sort_by: 'popularity.desc',
       page,
@@ -455,6 +448,7 @@ const API = {
   async getChineseDoramaTV(page = 1) {
     const data = await this._fetch('/discover/tv', {
       with_genres: '18',
+      without_genres: '16',
       with_original_language: 'zh',
       sort_by: 'popularity.desc',
       page,
@@ -465,6 +459,7 @@ const API = {
   async getRomanceDoramaTV(page = 1) {
     const data = await this._fetch('/discover/tv', {
       with_genres: '18,10749',
+      without_genres: '16',
       with_original_language: 'ja|zh|ko',
       sort_by: 'popularity.desc',
       page,
@@ -593,6 +588,8 @@ const API = {
     });
     return data.results;
   },
+
+  
 
   // === Similar & Recommendations ===
 

@@ -6,6 +6,7 @@ const APP = {
   _modalHistoryLen: 0,
   _playerHideHandler: null,
   _playerOpened: false,
+  _modalStack: [],
 
   /* --- Watch History --- */
   getHistory() {
@@ -106,12 +107,14 @@ const APP = {
         const carousel = existingRow.querySelector('.carousel');
         carousel.innerHTML = '';
         history.forEach(item => carousel.appendChild(UI.createHistoryCard(item)));
+        UI._fetchTVDetailsForCards(carousel);
         UI._setupCarouselNav(existingRow);
       } else {
         const row = UI.createRow('Continuar Assistindo', history, 'row-history', true);
         const carousel = row.querySelector('.carousel');
         carousel.innerHTML = '';
         history.forEach(item => carousel.appendChild(UI.createHistoryCard(item)));
+        UI._fetchTVDetailsForCards(carousel);
         const firstRow = main.querySelector('.catalog-row');
         if (firstRow) main.insertBefore(row, firstRow);
         else main.appendChild(row);
@@ -121,9 +124,27 @@ const APP = {
   },
 
   /* --- Page Renderers --- */
+  _renderHero(items) {
+    const heroRoot = document.getElementById('heroRoot');
+    heroRoot.innerHTML = '';
+    if (items && items.length > 0) {
+      heroRoot.appendChild(UI.createHeroCarousel(items.slice(0, 10)));
+      document.getElementById('mainContent').classList.add('has-hero');
+    } else {
+      document.getElementById('mainContent').classList.remove('has-hero');
+    }
+  },
+
+  _clearHero() {
+    document.getElementById('heroRoot').innerHTML = '';
+    document.getElementById('mainContent').classList.remove('has-hero');
+  },
+
   async renderHome() {
+    this._clearHero();
     const main = document.getElementById('mainContent');
     main.innerHTML = '';
+    try { const t = await API.getTrending('all', 'week'); this._renderHero(t); } catch {}
     const history = this.getHistory()
       .filter(h => Date.now() - h.timestamp < 7 * 24 * 3600 * 1000)
       .map(h => ({ ...h, media_type: h.media_type || h.type, poster_path: h.poster_path || h.poster, first_air_date: h.first_air_date || '', release_date: h.release_date || '', vote_average: h.vote_average || 0 }));
@@ -132,6 +153,7 @@ const APP = {
       const carousel = row.querySelector('.carousel');
       carousel.innerHTML = '';
       history.forEach(item => carousel.appendChild(UI.createHistoryCard(item)));
+      UI._fetchTVDetailsForCards(carousel);
       main.appendChild(row);
     }
     try { const t = await API.getTrending('all', 'week'); main.appendChild(UI.createRow('Em Alta', t, 'row-trending')); } catch {}
@@ -144,7 +166,9 @@ const APP = {
   },
 
   async renderMovies() {
+    this._clearHero();
     const main = document.getElementById('mainContent'); main.innerHTML = '';
+    try { const t = await API.getTrending('movie', 'week'); this._renderHero(t); } catch {}
     try { const t = await API.getTrending('movie', 'week'); main.appendChild(UI.createRow('Em Alta em Filmes', t, 'row-trending-movies')); } catch {}
     try { const n = await API.getNowPlaying(); main.appendChild(UI.createRow('Em Cartaz', n, 'row-now-playing')); } catch {}
     try { const t = await API.getTopRatedMovies(); main.appendChild(UI.createRow('Mais Bem Avaliados', t, 'row-top-movies')); } catch {}
@@ -152,7 +176,9 @@ const APP = {
   },
 
   async renderTV() {
+    this._clearHero();
     const main = document.getElementById('mainContent'); main.innerHTML = '';
+    try { const t = await API.getTrending('tv', 'week'); this._renderHero(t); } catch {}
     try { const t = await API.getTrending('tv', 'week'); main.appendChild(UI.createRow('Em Alta em Séries', t, 'row-trending-tv')); } catch {}
     try { const o = await API.getOnAirTV(); main.appendChild(UI.createRow('No Ar', o, 'row-on-air')); } catch {}
     try { const t = await API.getTopRatedTV(); main.appendChild(UI.createRow('Séries Aclamadas', t, 'row-top-tv')); } catch {}
@@ -176,7 +202,9 @@ const APP = {
   },
 
   async renderAnimes() {
+    this._clearHero();
     const main = document.getElementById('mainContent'); main.innerHTML = '';
+    try { const a = await API.getAnimeTrendingTV(); this._renderHero(a); } catch {}
     try { const a = await API.getAnimeTrendingTV(); main.appendChild(UI.createRow('Animes em Alta', a, 'row-anime-trending')); } catch {}
     try { const a = await API.getAnimeTV(); main.appendChild(UI.createRow('Animes Populares', a, 'row-anime-popular-tv')); } catch {}
     try { const a = await API.getAnimeMovies(); main.appendChild(UI.createRow('Filmes de Anime', a, 'row-anime-movies')); } catch {}
@@ -192,33 +220,55 @@ const APP = {
   },
 
   async renderDoramas() {
+    this._clearHero();
     const main = document.getElementById('mainContent'); main.innerHTML = '';
-    try { const d = await API.getDoramaTrendingTV(); main.appendChild(UI.createRow('Doramas em Alta', d, 'row-dorama-trending')); } catch {}
-    try { const d = await API.getDoramaTV(); main.appendChild(UI.createRow('Doramas Populares', d, 'row-dorama-popular-tv')); } catch {}
-    try { const d = await API.getDoramaNowAiring(); main.appendChild(UI.createRow('Exibindo Agora', d, 'row-dorama-airing')); } catch {}
-    try { const d = await API.getTopRatedDoramaTV(); main.appendChild(UI.createRow('Doramas Mais Bem Avaliados', d, 'row-dorama-top')); } catch {}
-    try { const d = await API.getKoreanDoramaTV(); main.appendChild(UI.createRow('K-Dramas', d, 'row-dorama-kr')); } catch {}
-    try { const d = await API.getJapaneseDoramaTV(); main.appendChild(UI.createRow('J-Dramas', d, 'row-dorama-jp')); } catch {}
-    try { const d = await API.getChineseDoramaTV(); main.appendChild(UI.createRow('C-Dramas', d, 'row-dorama-cn')); } catch {}
-    try { const d = await API.getRomanceDoramaTV(); main.appendChild(UI.createRow('Doramas Românticos', d, 'row-dorama-romance')); } catch {}
-    try { const d = await API.getDoramaMovies(); main.appendChild(UI.createRow('Filmes de Drama Asiático', d, 'row-dorama-movies')); } catch {}
+    const filterAnimation = (items) => items.filter(i => !i.genre_ids?.includes(16));
+    try { const d = filterAnimation(await API.getDoramaTrendingTV()); this._renderHero(d); } catch {}
+    try { const d = filterAnimation(await API.getDoramaTrendingTV()); main.appendChild(UI.createRow('Doramas em Alta', d, 'row-dorama-trending')); } catch {}
+    try { const d = filterAnimation(await API.getDoramaTV()); main.appendChild(UI.createRow('Doramas Populares', d, 'row-dorama-popular-tv')); } catch {}
+    try { const d = filterAnimation(await API.getDoramaNowAiring()); main.appendChild(UI.createRow('Exibindo Agora', d, 'row-dorama-airing')); } catch {}
+    try { const d = filterAnimation(await API.getTopRatedDoramaTV()); main.appendChild(UI.createRow('Doramas Mais Bem Avaliados', d, 'row-dorama-top')); } catch {}
+    try { const d = filterAnimation(await API.getKoreanDoramaTV()); main.appendChild(UI.createRow('K-Dramas', d, 'row-dorama-kr')); } catch {}
+    try { const d = filterAnimation(await API.getJapaneseDoramaTV()); main.appendChild(UI.createRow('J-Dramas', d, 'row-dorama-jp')); } catch {}
+    try { const d = filterAnimation(await API.getChineseDoramaTV()); main.appendChild(UI.createRow('C-Dramas', d, 'row-dorama-cn')); } catch {}
+    try { const d = filterAnimation(await API.getRomanceDoramaTV()); main.appendChild(UI.createRow('Doramas Românticos', d, 'row-dorama-romance')); } catch {}
+    try { const d = filterAnimation(await API.getDoramaMovies()); main.appendChild(UI.createRow('Filmes de Drama Asiático', d, 'row-dorama-movies')); } catch {}
   },
 
   async renderFavorites() {
+    this._clearHero();
     const main = document.getElementById('mainContent'); main.innerHTML = '';
     const favorites = this.getFavorites();
     if (favorites.length === 0) { main.innerHTML = '<div style="text-align:center;padding:80px 20px;color:var(--text-muted)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="margin-bottom:16px;color:var(--text-muted);opacity:0.4"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><p style="font-size:16px">Nenhum favorito ainda</p><p style="font-size:13px;margin-top:4px">Clique no coração nos cards para adicionar</p></div>'; return; }
-    main.appendChild(UI.createRow('Seus Favoritos', favorites, 'row-favorites'));
+    const section = document.createElement('div');
+    section.className = 'catalog-row';
+    section.innerHTML = '<div class="row-header"><h2 class="row-title">Seus Favoritos</h2></div>';
+    const grid = document.createElement('div');
+    grid.className = 'favorites-grid';
+    favorites.forEach(item => grid.appendChild(UI.createCard(item)));
+    UI._fetchTVDetailsForCards(grid);
+    section.appendChild(grid);
+    main.appendChild(section);
   },
 
   async renderWatchlist() {
+    this._clearHero();
     const main = document.getElementById('mainContent'); main.innerHTML = '';
     const watchlist = this.getWatchlist();
     if (watchlist.length === 0) { main.innerHTML = '<div style="text-align:center;padding:80px 20px;color:var(--text-muted)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="margin-bottom:16px;color:var(--text-muted);opacity:0.4"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg><p style="font-size:16px">Sua lista está vazia</p><p style="font-size:13px;margin-top:4px">Clique no + nos cards para adicionar</p></div>'; return; }
-    main.appendChild(UI.createRow('Minha Lista', watchlist, 'row-watchlist'));
+    const section = document.createElement('div');
+    section.className = 'catalog-row';
+    section.innerHTML = '<div class="row-header"><h2 class="row-title">Minha Lista</h2></div>';
+    const grid = document.createElement('div');
+    grid.className = 'favorites-grid';
+    watchlist.forEach(item => grid.appendChild(UI.createCard(item)));
+    UI._fetchTVDetailsForCards(grid);
+    section.appendChild(grid);
+    main.appendChild(section);
   },
 
   async renderSearch(query) {
+    this._clearHero();
     const main = document.getElementById('mainContent'); main.innerHTML = '';
     if (!query.trim()) { this.renderHome(); return; }
     const header = document.createElement('div'); header.className = 'search-results'; header.innerHTML = `<h2>Resultados para "${query}"</h2>`; main.appendChild(header);
@@ -228,13 +278,18 @@ const APP = {
       if (results.length + (people?.length || 0) === 0) { grid.innerHTML = '<p style="color: var(--text-muted); padding: 20px 0;">Nenhum resultado encontrado.</p>'; return; }
       if (people?.length > 0) { const ps = document.createElement('div'); ps.innerHTML = '<h3 style="font-size:16px;margin-bottom:12px;color:var(--gold)">Pessoas</h3>'; main.appendChild(ps); people.slice(0, 10).forEach(item => grid.appendChild(UI.createPersonCard(item))); }
       results.forEach(item => grid.appendChild(UI.createCard(item)));
+      UI._fetchTVDetailsForCards(grid);
     } catch (e) { grid.innerHTML = '<p style="color: #e74c3c;">Erro na busca.</p>'; }
   },
 
-  /* --- Detail Modal --- */
+  /* --- Detail Modal (Stacked) --- */
   async showDetail(mediaType, id, element, itemData = null) {
     const root = document.getElementById('modalRoot');
     if (itemData) this.addToHistory(itemData);
+
+    const modalId = `modal-${Date.now()}`;
+    this._modalStack.push(modalId);
+    const zIndex = 2000 + this._modalStack.length;
 
     try {
       const details = await API.getDetails(mediaType, id);
@@ -260,10 +315,10 @@ const APP = {
       const isFav = this.isFavorite(id, mediaType);
       const isInWl = this.isInWatchlist(id, mediaType);
 
-      root.innerHTML = `
-        <div class="modal-overlay" id="modalOverlay">
+      const modalHTML = `
+        <div class="modal-overlay" id="${modalId}" style="z-index: ${zIndex}">
           <div class="modal">
-            <button class="modal-close" id="modalClose"><svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            <button class="modal-close" data-modal-id="${modalId}"><svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             ${backdrop ? `<div class="modal-backdrop"><img src="${backdrop}" alt="">${playBtnHTML}<div class="modal-backdrop-gradient"></div></div>` : ''}
             <div class="modal-body">
               <div class="modal-title-row">
@@ -288,50 +343,80 @@ const APP = {
           </div>
         </div>`;
 
-      document.getElementById('modalOverlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) { e.preventDefault(); this.closeModal(); } });
-      document.getElementById('modalClose').addEventListener('click', () => this.closeModal());
+      root.insertAdjacentHTML('beforeend', modalHTML);
 
-      const modalFavBtn = document.querySelector('[data-action="modal-fav"]');
+      const overlay = document.getElementById(modalId);
+      overlay.addEventListener('click', (e) => { if (e.target === e.currentTarget) { e.preventDefault(); this.closeModal(); } });
+      overlay.querySelector('.modal-close').addEventListener('click', () => this.closeModal());
+
+      const modalFavBtn = overlay.querySelector('[data-action="modal-fav"]');
       if (modalFavBtn) modalFavBtn.addEventListener('click', () => {
         this.toggleFavorite({ id, media_type: mediaType, title, poster_path: details.poster_path, vote_average: details.vote_average });
         modalFavBtn.classList.toggle('active');
         const svg = modalFavBtn.querySelector('svg'); if (svg) svg.setAttribute('fill', modalFavBtn.classList.contains('active') ? 'currentColor' : 'none');
       });
-      const modalWlBtn = document.querySelector('[data-action="modal-wl"]');
+      const modalWlBtn = overlay.querySelector('[data-action="modal-wl"]');
       if (modalWlBtn) modalWlBtn.addEventListener('click', () => {
         this.toggleWatchlist({ id, media_type: mediaType, title, poster_path: details.poster_path, vote_average: details.vote_average });
         modalWlBtn.classList.toggle('active');
         const svg = modalWlBtn.querySelector('svg'); if (svg) svg.setAttribute('fill', modalWlBtn.classList.contains('active') ? 'currentColor' : 'none');
       });
 
-      document.querySelectorAll('.season-btn').forEach(btn => btn.addEventListener('click', () => this.loadSeason(btn.dataset.id, btn.dataset.season, btn.dataset.imdb)));
+      overlay.querySelectorAll('.season-btn').forEach(btn => btn.addEventListener('click', () => this.loadSeason(btn.dataset.id, btn.dataset.season, btn.dataset.imdb)));
       document.addEventListener('keydown', this._escapeHandler);
 
       APP._modalHistoryLen = history.length;
-      history.pushState({ modal: true }, '');
+      history.pushState({ modal: true, modalId }, '');
       window.addEventListener('popstate', this._popHandler);
       document.body.style.overflow = 'hidden';
 
-      const backdropPlayBtn = document.querySelector('.backdrop-play');
+      const backdropPlayBtn = overlay.querySelector('.backdrop-play');
       if (backdropPlayBtn) backdropPlayBtn.addEventListener('click', async (e) => { APP.smartPlay(mediaType, id, imdbId, title, e.currentTarget, seasons); });
 
-      this.loadModalExtras(mediaType, id);
+      this.loadModalExtras(mediaType, id, overlay);
       this.updateScroll();
     } catch (e) {
-      root.innerHTML = `<div class="modal-overlay" id="modalOverlay"><div class="modal"><button class="modal-close" id="modalClose"><svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><div class="modal-body"><p class="error">Erro ao carregar detalhes.</p></div></div></div>`;
-      document.getElementById('modalClose').addEventListener('click', () => this.closeModal());
-      APP._modalHistoryLen = history.length; history.pushState({ modal: true }, '');
+      const errorHTML = `<div class="modal-overlay" id="${modalId}" style="z-index: ${zIndex}"><div class="modal"><button class="modal-close" data-modal-id="${modalId}"><svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><div class="modal-body"><p class="error">Erro ao carregar detalhes.</p></div></div></div>`;
+      root.insertAdjacentHTML('beforeend', errorHTML);
+      const overlay = document.getElementById(modalId);
+      overlay.querySelector('.modal-close').addEventListener('click', () => this.closeModal());
+      APP._modalHistoryLen = history.length; history.pushState({ modal: true, modalId }, '');
       window.addEventListener('popstate', this._popHandler); this.updateScroll();
     }
   },
 
   closeModal(fromHistory = false) {
-    document.getElementById('modalRoot').innerHTML = '';
+    const root = document.getElementById('modalRoot');
+    const lastModal = root.querySelector('.modal-overlay:last-child');
+    if (lastModal) {
+      lastModal.remove();
+      this._modalStack.pop();
+    }
+
+    document.removeEventListener('keydown', this._escapeHandler);
+    if (this._modalStack.length === 0) {
+      window.removeEventListener('popstate', this._popHandler);
+      document.body.style.overflow = '';
+      this.refreshHistoryRow();
+    } else {
+      document.addEventListener('keydown', this._escapeHandler);
+    }
+    if (!fromHistory) {
+      APP._blockCloseModal = true;
+      history.back();
+      setTimeout(() => { APP._blockCloseModal = false; }, 100);
+    }
+  },
+
+  closeAllModals() {
+    const root = document.getElementById('modalRoot');
+    root.innerHTML = '';
+    this._modalStack = [];
     document.removeEventListener('keydown', this._escapeHandler);
     window.removeEventListener('popstate', this._popHandler);
-    this.updateScroll();
-    if (!fromHistory) history.back();
+    document.body.style.overflow = '';
     this.refreshHistoryRow();
+    this.updateScroll();
   },
 
   _escapeHandler(e) { if (e.key === 'Escape' && !document.getElementById('playerOverlay')) APP.closeModal(); },
@@ -370,7 +455,7 @@ const APP = {
           type: 'tv', seriesId: id, seriesImdbId: imdbId, season: targetS, episode: targetE,
           episodeData: eps.find(ep => ep.episode_number === targetE), episodes: eps, seasons, seriesTitle: title
         });
-        if (document.getElementById('modalOverlay')) this.loadSeason(id, targetS, imdbId);
+        if (document.querySelector('.modal-overlay')) this.loadSeason(id, targetS, imdbId);
       } catch (err) {
         this.playVideo(CONFIG.buildPlayUrl(imdbId, 1, 1), {
           type: 'tv', seriesId: id, seriesImdbId: imdbId, season: 1, episode: 1, episodes: [], seasons, seriesTitle: title
@@ -532,12 +617,12 @@ const APP = {
     APP._playerHideHandler = null;
     if (document.fullscreenElement || document.webkitFullscreenElement) { (document.exitFullscreen || document.webkitExitFullscreen || (() => {})).call(document); }
     if (!fromHistory) { APP._isExitingPlayer = true; APP._blockCloseModal = true; APP._playerOpened = false; history.back(); }
-    else { APP._isExitingPlayer = false; APP._blockCloseModal = false; if (!document.getElementById('modalOverlay') && this.currentPlayContext) { const ctx = this.currentPlayContext; const mediaType = ctx.type === 'tv' ? 'tv' : 'movie'; const id = mediaType === 'tv' ? ctx.seriesId : ctx.id; if (id) this.showDetail(mediaType, id); } this.updateScroll(); }
+    else { APP._isExitingPlayer = false; APP._blockCloseModal = false; if (!document.querySelector('.modal-overlay') && this.currentPlayContext) { const ctx = this.currentPlayContext; const mediaType = ctx.type === 'tv' ? 'tv' : 'movie'; const id = mediaType === 'tv' ? ctx.seriesId : ctx.id; if (id) this.showDetail(mediaType, id); } this.updateScroll(); }
     this.updateScroll();
   },
 
   updateScroll() {
-    const hasModal = !!document.getElementById('modalOverlay');
+    const hasModal = !!document.querySelector('.modal-overlay');
     const hasPlayer = !!document.getElementById('playerOverlay');
     document.body.style.overflow = (hasModal || hasPlayer) ? 'hidden' : '';
   },
@@ -545,9 +630,9 @@ const APP = {
   _playerEscapeHandler(e) { if (e.key === 'Escape') APP.closePlayer(); },
   _playerPopHandler(e) { if (APP._isExitingPlayer) return; APP.closePlayer(true); },
 
-  async loadModalExtras(mediaType, id) {
-    const modalBody = document.querySelector('.modal-body'); if (!modalBody) return;
-    let extrasContainer = document.getElementById('modalExtras');
+  async loadModalExtras(mediaType, id, overlay = null) {
+    const modalBody = (overlay || document).querySelector('.modal-body'); if (!modalBody) return;
+    let extrasContainer = modalBody.querySelector('#modalExtras');
     if (!extrasContainer) { extrasContainer = document.createElement('div'); extrasContainer.id = 'modalExtras'; modalBody.appendChild(extrasContainer); }
     const [similar, recommendations] = await Promise.allSettled([API.getSimilar(mediaType, id), API.getRecommendations(mediaType, id)]);
     const similarResults = similar.status === 'fulfilled' ? similar.value : [];
@@ -559,16 +644,17 @@ const APP = {
   },
 
   async loadSeason(seriesId, seasonNum, seriesImdbId) {
-    const list = document.getElementById('episodeList');
+    const overlay = document.querySelector('.modal-overlay:last-child');
+    const list = overlay?.querySelector('#episodeList') || document.getElementById('episodeList');
     list.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-    document.querySelectorAll('.season-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector(`.season-btn[data-season="${seasonNum}"]`)?.classList.add('active');
+    (overlay || document).querySelectorAll('.season-btn').forEach(b => b.classList.remove('active'));
+    (overlay || document).querySelector(`.season-btn[data-season="${seasonNum}"]`)?.classList.add('active');
     if (!seriesImdbId) { try { seriesImdbId = await API.getImdbId('tv', seriesId); } catch {} }
 
     try {
       const data = await API._fetch(`/tv/${seriesId}/season/${seasonNum}`);
       const episodes = data.episodes || [];
-      const seriesTitle = document.querySelector('.modal-title')?.textContent || '';
+      const seriesTitle = (overlay || document).querySelector('.modal-title')?.textContent || '';
       list.innerHTML = episodes.map(ep => {
         const thumb = ep.still_path ? CONFIG.buildImageUrl(ep.still_path, 'w185') : '';
         const isWatched = APP.isWatched(seriesImdbId, seasonNum, ep.episode_number);
@@ -599,19 +685,136 @@ const APP = {
     toggle.addEventListener('click', (e) => { e.stopPropagation(); const isOpen = !panel.classList.contains('hidden'); panel.classList.toggle('hidden'); toggle.classList.toggle('open'); if (!isOpen) setTimeout(() => document.addEventListener('click', this._closeGenresHandler, { once: true }), 0); });
   },
 
+  _allGenres: { movie: [], tv: [], animes: [], doramas: [], kids: [] },
+
   async initGenres() {
-    const movieCol = document.getElementById('genresMovie'); const tvCol = document.getElementById('genresTV');
-    if (!movieCol || !tvCol) return;
+    const movieCol = document.getElementById('genresMovie');
+    const tvCol = document.getElementById('genresTV');
+    const animesCol = document.getElementById('genresAnimes');
+    const doramasCol = document.getElementById('genresDoramas');
+    const kidsCol = document.getElementById('genresKids');
+    if (!movieCol || !tvCol || !animesCol || !doramasCol || !kidsCol) return;
     try {
       const [movieGenres, tvGenres] = await Promise.all([API.getGenres('movie'), API.getGenres('tv')]);
-      movieCol.innerHTML = '<div class="genres-column-title">Filmes</div>'; tvCol.innerHTML = '<div class="genres-column-title">Séries</div>';
-      movieGenres.forEach(g => { const pill = document.createElement('button'); pill.className = 'genre-pill'; pill.textContent = g.name; pill.addEventListener('click', () => this.navigateTo('genre', { id: g.id, name: g.name })); movieCol.appendChild(pill); });
-      tvGenres.forEach(g => { const pill = document.createElement('button'); pill.className = 'genre-pill'; pill.textContent = g.name; pill.addEventListener('click', () => this.navigateTo('genre', { id: g.id, name: g.name })); tvCol.appendChild(pill); });
+
+      // Animes use movie genres (discover/movie with Asian language + genre 16)
+      // Doramas use TV genres (discover/tv with Asian language, exclude animation)
+      // Kids use movie genres (discover/movie with Western language + genre 16)
+      const animeGenres = movieGenres; // All genres for animes
+      const doramaGenres = tvGenres; // All genres for doramas
+      const kidsGenres = movieGenres.filter(g => [16, 12, 35, 14, 10751, 10770, 10402].includes(g.id)); // Animation, Adventure, Comedy, Fantasy, Family, TV Movie, Music
+
+      this._allGenres = { movie: movieGenres, tv: tvGenres, animes: animeGenres, doramas: doramaGenres, kids: kidsGenres };
+
+      const populateCol = (col, title, genres, navPage, navKey) => {
+        col.innerHTML = `<div class="genres-column-title">${title}</div>`;
+        genres.forEach(g => {
+          const pill = document.createElement('button');
+          pill.className = 'genre-pill';
+          pill.textContent = g.name;
+          pill.addEventListener('click', () => this.navigateTo(navPage, { [navKey]: g.id, name: g.name, genreName: g.name }));
+          col.appendChild(pill);
+        });
+      };
+
+      populateCol(movieCol, 'Filmes', movieGenres, 'movies-genre', 'id');
+      populateCol(tvCol, 'Séries', tvGenres, 'tv-genre', 'id');
+      populateCol(animesCol, 'Animes', animeGenres, 'animes-genre', 'genreId');
+      populateCol(doramasCol, 'Doramas', doramaGenres, 'doramas-genre', 'genreId');
+      populateCol(kidsCol, 'Kids', kidsGenres, 'kids-genre', 'genreId');
+
+      this._updateGenresVisibility();
+      this.updateDrawerGenres();
     } catch {}
+  },
+
+
+  updateDrawerGenres() {
+    const { movie, tv, animes, doramas, kids } = this._allGenres;
+    if (!movie.length && !tv.length) return;
+    const page = this.currentPage;
+    const container = document.getElementById('mobileDrawerContent');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const createSection = (title, genres, navPage) => {
+      if (!genres.length) return;
+      const h3 = document.createElement('h3'); h3.textContent = title;
+      const list = document.createElement('div'); list.className = 'drawer-genre-list';
+      genres.forEach(g => {
+        const btn = document.createElement('button'); btn.className = 'drawer-genre-btn'; btn.textContent = g.name;
+        const params = ['movies-genre','tv-genre'].includes(navPage) ? { id: g.id, name: g.name } : { genreId: g.id, genreName: g.name };
+        btn.addEventListener('click', () => { this.closeMobileDrawer(); this.navigateTo(navPage, params); });
+        list.appendChild(btn);
+      });
+      container.appendChild(h3); container.appendChild(list);
+    };
+
+    if (page === 'home') {
+      createSection('Filmes', movie, 'movies-genre');
+      createSection('Séries', tv, 'tv-genre');
+      createSection('Animes', animes, 'animes-genre');
+      createSection('Doramas', doramas, 'doramas-genre');
+      createSection('Kids', kids, 'kids-genre');
+    } else if (page === 'movies') {
+      createSection('Filmes', movie, 'movies-genre');
+    } else if (page === 'tv') {
+      createSection('Séries', tv, 'tv-genre');
+    } else if (page === 'animes') {
+      createSection('Animes', animes, 'animes-genre');
+    } else if (page === 'doramas') {
+      createSection('Doramas', doramas, 'doramas-genre');
+    } else if (page === 'animation') {
+      createSection('Kids', kids, 'kids-genre');
+    } else {
+      createSection('Filmes', movie, 'movies-genre');
+      createSection('Séries', tv, 'tv-genre');
+    }
+  },
+
+  setupMobileDrawer() {
+    const btn = document.getElementById('hamburgerBtn');
+    const overlay = document.getElementById('mobileDrawerOverlay');
+    const close = document.getElementById('mobileDrawerClose');
+    if (!btn) return;
+    btn.addEventListener('click', () => this.openMobileDrawer());
+    if (overlay) overlay.addEventListener('click', () => this.closeMobileDrawer());
+    if (close) close.addEventListener('click', () => this.closeMobileDrawer());
+  },
+
+  openMobileDrawer() {
+    document.getElementById('mobileDrawer')?.classList.add('open');
+    document.getElementById('mobileDrawerOverlay')?.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  },
+
+  closeMobileDrawer() {
+    document.getElementById('mobileDrawer')?.classList.remove('open');
+    document.getElementById('mobileDrawerOverlay')?.classList.remove('open');
+    document.body.style.overflow = '';
   },
 
   closeGenres() { const panel = document.getElementById('genresPanel'); const toggle = document.getElementById('genresToggle'); if (panel) panel.classList.add('hidden'); if (toggle) toggle.classList.remove('open'); },
   _closeGenresHandler(e) { const panel = document.getElementById('genresPanel'); const toggle = document.getElementById('genresToggle'); if (panel && toggle && !e.target.closest('.genres-dropdown')) { panel.classList.add('hidden'); toggle.classList.remove('open'); } },
+
+  _updateGenresVisibility() {
+    const page = this.currentPage;
+    const cols = {
+      movie: document.getElementById('genresMovie'),
+      tv: document.getElementById('genresTV'),
+      animes: document.getElementById('genresAnimes'),
+      doramas: document.getElementById('genresDoramas'),
+      kids: document.getElementById('genresKids'),
+    };
+    const show = (id) => { if (cols[id]) cols[id].style.display = ''; };
+    const hide = (id) => { if (cols[id]) cols[id].style.display = 'none'; };
+    Object.keys(cols).forEach(show);
+    if (page === 'movies') { ['tv', 'animes', 'doramas', 'kids'].forEach(hide); }
+    else if (page === 'tv') { ['movie', 'animes', 'doramas', 'kids'].forEach(hide); }
+    else if (page === 'animes') { ['movie', 'tv', 'doramas', 'kids'].forEach(hide); }
+    else if (page === 'doramas') { ['movie', 'tv', 'animes', 'kids'].forEach(hide); }
+    else if (page === 'animation') { ['movie', 'tv', 'animes', 'doramas'].forEach(hide); }
+  },
 
   /* --- Navigation --- */
   navigateTo(page, params = {}) {
@@ -619,20 +822,120 @@ const APP = {
     document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.page === page));
     document.querySelectorAll('.mobile-nav-item').forEach(btn => btn.classList.toggle('active', btn.dataset.page === page));
     this.closeGenres();
+    this.updateDrawerGenres();
+    this._updateGenresVisibility();
     switch (page) {
       case 'home': this.renderHome(); break; case 'movies': this.renderMovies(); break;
       case 'tv': this.renderTV(); break; case 'animes': this.renderAnimes(); break;
       case 'doramas': this.renderDoramas(); break; case 'animation': this.renderAnimation(); break;
       case 'genre': this.renderGenre(params.id, params.name); break;
+    case 'movies-genre': this.renderMoviesGenre(params.id, params.name); break;
+    case 'tv-genre': this.renderTVGenre(params.id, params.name); break;
+      case 'animes-genre': this.renderCategoryGenre('animes', params.genreId, params.genreName); break;
+      case 'doramas-genre': this.renderCategoryGenre('doramas', params.genreId, params.genreName); break;
+      case 'kids-genre': this.renderCategoryGenre('animation', params.genreId, params.genreName); break;
       case 'people': this.renderPeople(); break; case 'person': this.renderPerson(params.id); break;
       case 'favorites': this.renderFavorites(); break; case 'watchlist': this.renderWatchlist(); break;
     }
   },
 
   async renderGenre(genreId, genreName) {
+    this._clearHero();
     const main = document.getElementById('mainContent'); main.innerHTML = '';
     try { const m = await API.getAllMoviesByGenre(genreId, 5); if (m.length > 0) main.appendChild(UI.createRow(`${genreName} — Filmes`, m, `row-genre-movies-${genreId}`, false, true)); } catch {}
     try { const t = await API.getAllTVByGenre(genreId, 5); if (t.length > 0) main.appendChild(UI.createRow(`${genreName} — Séries`, t, `row-genre-tv-${genreId}`, false, true)); } catch {}
+  },
+
+  async renderMoviesGenre(genreId, genreName) {
+    this._clearHero();
+    const main = document.getElementById('mainContent'); main.innerHTML = '';
+    try {
+      const m = await API.getAllMoviesByGenre(genreId, 5);
+      if (m.length > 0) main.appendChild(UI.createRow(`${genreName} — Filmes`, m, `row-movies-genre-${genreId}`, false, true));
+      else main.innerHTML = '<div style="text-align:center;padding:80px 20px;color:var(--text-muted)"><p style="font-size:16px">Nenhum filme encontrado para este gênero</p></div>';
+    } catch {
+      main.innerHTML = '<div style="text-align:center;padding:80px 20px;color:var(--text-muted)"><p style="font-size:16px">Erro ao carregar filmes</p></div>';
+    }
+  },
+
+  async renderTVGenre(genreId, genreName) {
+    this._clearHero();
+    const main = document.getElementById('mainContent'); main.innerHTML = '';
+    try {
+      const t = await API.getAllTVByGenre(genreId, 5);
+      if (t.length > 0) main.appendChild(UI.createRow(`${genreName} — Séries`, t, `row-tv-genre-${genreId}`, false, true));
+      else main.innerHTML = '<div style="text-align:center;padding:80px 20px;color:var(--text-muted)"><p style="font-size:16px">Nenhuma série encontrada para este gênero</p></div>';
+    } catch {
+      main.innerHTML = '<div style="text-align:center;padding:80px 20px;color:var(--text-muted)"><p style="font-size:16px">Erro ao carregar séries</p></div>';
+    }
+  },
+
+  async renderCategoryGenre(category, genreId, genreName) {
+    this._clearHero();
+    const main = document.getElementById('mainContent'); main.innerHTML = '';
+
+    const categoryConfig = {
+      animes: { baseGenre: '16', language: 'ja|zh|ko', label: 'Animes' },
+      doramas: { baseGenre: '18', language: 'ja|zh|ko', excludeGenres: [16], label: 'Doramas' },
+      animation: { baseGenre: '16', excludeLanguages: ['ja', 'zh', 'ko'], label: 'Kids' },
+    };
+
+    const config = categoryConfig[category];
+    if (!config) return;
+
+    const combinedGenres = `${config.baseGenre},${genreId}`;
+
+    try {
+      // Fetch multiple pages for more results
+      const fetchPages = async (type) => {
+        let all = [];
+        for (let page = 1; page <= 3; page++) {
+          const params = {
+            with_genres: combinedGenres,
+            sort_by: 'popularity.desc',
+            page,
+          };
+          if (config.language) params.with_original_language = config.language;
+          if (config.excludeGenres) params.without_genres = config.excludeGenres.join(',');
+
+          const data = await API._fetch(`/discover/${type}`, params);
+          all = all.concat(data.results || []);
+          if (page >= (data.total_pages || 1)) break;
+        }
+        return all;
+      };
+
+      const [movies, tv] = await Promise.all([
+        fetchPages('movie'),
+        fetchPages('tv'),
+      ]);
+
+      const filterItems = (items) => {
+        let result = items;
+        if (config.excludeLanguages) {
+          result = result.filter(i => !config.excludeLanguages.includes(i.original_language));
+        }
+        if (config.excludeGenres) {
+          result = result.filter(i => !i.genre_ids?.some(g => config.excludeGenres.includes(g)));
+        }
+        return result;
+      };
+
+      const filteredMovies = filterItems(movies);
+      const filteredTV = filterItems(tv);
+
+      if (filteredMovies.length > 0) {
+        main.appendChild(UI.createRow(`${genreName} — Filmes`, filteredMovies, `row-${category}-genre-movies-${genreId}`, false, true));
+      }
+      if (filteredTV.length > 0) {
+        main.appendChild(UI.createRow(`${genreName} — Séries`, filteredTV, `row-${category}-genre-tv-${genreId}`, false, true));
+      }
+      if (filteredMovies.length === 0 && filteredTV.length === 0) {
+        main.innerHTML = '<div style="text-align:center;padding:80px 20px;color:var(--text-muted)"><p style="font-size:16px">Nenhum resultado encontrado para este gênero</p></div>';
+      }
+    } catch {
+      main.innerHTML = '<div style="text-align:center;padding:80px 20px;color:var(--text-muted)"><p style="font-size:16px">Erro ao carregar conteúdo</p></div>';
+    }
   },
 
   async renderPeople() {
@@ -642,6 +945,10 @@ const APP = {
 
   async renderPerson(personId) {
     const root = document.getElementById('modalRoot');
+    const modalId = `modal-${Date.now()}`;
+    this._modalStack.push(modalId);
+    const zIndex = 2000 + this._modalStack.length;
+
     try {
       const [person, credits] = await Promise.all([API.getPersonDetails(personId), API.getPersonCredits(personId)]);
       const bio = person.biography || 'Biografia não disponível.';
@@ -650,19 +957,24 @@ const APP = {
       const acting = credits.cast.filter(c => c.poster_path || c.backdrop_path).sort((a, b) => b.popularity - a.popularity).slice(0, 20);
       const photoHTML = photo ? `<div class="person-photo"><img src="${photo}" alt="${person.name}"></div>` : `<div class="person-photo person-photo--placeholder"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>`;
 
-      root.innerHTML = `<div class="modal-overlay" id="modalOverlay"><div class="modal"><button class="modal-close" id="modalClose"><svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><div class="person-header">${photoHTML}<div class="person-info"><h2 class="person-name">${person.name}</h2>${person.birthday ? `<span class="person-meta">${person.birthday}${person.deathday ? ' — ' + person.deathday : ''}</span>` : ''}${knownFor ? `<span class="person-meta">Conhecido por: ${knownFor}</span>` : ''}</div></div><div class="modal-body"><p class="modal-overview">${bio}</p>${acting.length > 0 ? '<h3 style="font-size:18px;margin:20px 0 12px;color:var(--text-primary)">Filmografia</h3>' : ''}</div></div></div>`;
+      const modalHTML = `<div class="modal-overlay" id="${modalId}" style="z-index:${zIndex}"><div class="modal"><button class="modal-close" data-modal-id="${modalId}"><svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><div class="person-header">${photoHTML}<div class="person-info"><h2 class="person-name">${person.name}</h2>${person.birthday ? `<span class="person-meta">${person.birthday}${person.deathday ? ' — ' + person.deathday : ''}</span>` : ''}${knownFor ? `<span class="person-meta">Conhecido por: ${knownFor}</span>` : ''}</div></div><div class="modal-body"><p class="modal-overview">${bio}</p>${acting.length > 0 ? '<h3 style="font-size:18px;margin:20px 0 12px;color:var(--text-primary)">Filmografia</h3>' : ''}</div></div></div>`;
 
-      if (acting.length > 0) { const grid = document.createElement('div'); grid.className = 'search-grid person-filmography'; acting.forEach(item => { const mediaType = item.media_type || (item.first_air_date ? 'tv' : 'movie'); grid.appendChild(UI.createCard({ ...item, media_type: mediaType })); }); root.querySelector('.modal-body').appendChild(grid); }
+      root.insertAdjacentHTML('beforeend', modalHTML);
+      const overlay = document.getElementById(modalId);
 
-      document.getElementById('modalOverlay').addEventListener('click', (e) => { if (e.target === e.currentTarget) this.closeModal(); });
-      document.getElementById('modalClose').addEventListener('click', () => this.closeModal());
+      if (acting.length > 0) { const grid = document.createElement('div'); grid.className = 'search-grid person-filmography'; acting.forEach(item => { const mediaType = item.media_type || (item.first_air_date ? 'tv' : 'movie'); grid.appendChild(UI.createCard({ ...item, media_type: mediaType })); }); overlay.querySelector('.modal-body').appendChild(grid); }
+
+      overlay.addEventListener('click', (e) => { if (e.target === e.currentTarget) this.closeModal(); });
+      overlay.querySelector('.modal-close').addEventListener('click', () => this.closeModal());
       document.addEventListener('keydown', this._escapeHandler);
       document.body.style.overflow = 'hidden';
     } catch {
-      root.innerHTML = `<div class="modal-overlay" id="modalOverlay"><div class="modal"><button class="modal-close" id="modalClose"><svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><div class="modal-body"><p class="error">Erro ao carregar pessoa.</p></div></div></div>`;
-      document.getElementById('modalClose').addEventListener('click', () => this.closeModal());
+      const errorHTML = `<div class="modal-overlay" id="${modalId}" style="z-index:${zIndex}"><div class="modal"><button class="modal-close" data-modal-id="${modalId}"><svg class="icon-md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button><div class="modal-body"><p class="error">Erro ao carregar pessoa.</p></div></div></div>`;
+      root.insertAdjacentHTML('beforeend', errorHTML);
+      const overlay = document.getElementById(modalId);
+      overlay.querySelector('.modal-close').addEventListener('click', () => this.closeModal());
     }
-    APP._modalHistoryLen = history.length; history.pushState({ modal: true }, ''); window.addEventListener('popstate', this._popHandler);
+    APP._modalHistoryLen = history.length; history.pushState({ modal: true, modalId }, ''); window.addEventListener('popstate', this._popHandler);
   },
 
   /* --- Init --- */
@@ -672,13 +984,22 @@ const APP = {
 
 
     document.querySelectorAll('.nav-tab:not(.genres-toggle)').forEach(tab => tab.addEventListener('click', () => this.navigateTo(tab.dataset.page)));
-    document.querySelectorAll('.mobile-nav-item').forEach(btn => btn.addEventListener('click', () => this.navigateTo(btn.dataset.page)));
-    this.setupGenresToggle(); this.initGenres();
-    document.getElementById('logo').addEventListener('click', () => this.navigateTo('home'));
+    document.querySelectorAll('.mobile-nav-item').forEach(btn => btn.addEventListener('click', () => { this.closeAllModals(); this.navigateTo(btn.dataset.page); window.scrollTo({ top: 0, behavior: 'smooth' }); }));
+    this.setupGenresToggle(); this.initGenres(); this.setupMobileDrawer();
+    document.getElementById('logo').addEventListener('click', () => {
+      this.closeAllModals();
+      this.navigateTo('home');
+    });
 
     const searchInput = document.getElementById('searchInput');
+    const searchClear = document.getElementById('searchClear');
     searchInput.addEventListener('input', (e) => { clearTimeout(this.searchTimeout); this.searchTimeout = setTimeout(() => this.renderSearch(e.target.value), 400); });
     searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { clearTimeout(this.searchTimeout); this.renderSearch(e.target.value); } });
+    searchClear.addEventListener('click', () => {
+      searchInput.value = '';
+      searchInput.focus();
+      this.renderHome();
+    });
 
     // Delegated click handler — main content
     document.getElementById('mainContent').addEventListener('click', async (e) => {

@@ -12,6 +12,9 @@
 <body>
 <header class="header" id="header">
 <a class="logo" id="logo">NEKYFLOW</a>
+<button class="hamburger-btn" id="hamburgerBtn" aria-label="Menu">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+</button>
 <nav class="nav-tabs" id="navTabs">
 <button class="nav-tab active" data-page="home">Início</button>
 <button class="nav-tab" data-page="movies">Filmes</button>
@@ -29,13 +32,31 @@ Gêneros <svg class="genres-arrow" viewBox="0 0 24 24" fill="none" stroke="curre
 <div class="genres-panel hidden" id="genresPanel">
 <div class="genres-column" id="genresMovie"></div>
 <div class="genres-column" id="genresTV"></div>
+<div class="genres-column" id="genresAnimes"></div>
+<div class="genres-column" id="genresDoramas"></div>
+<div class="genres-column" id="genresKids"></div>
 </div>
 </div>
 <div class="search-container">
 <span class="search-icon"><svg class="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
 <input class="search-input" id="searchInput" type="text" placeholder="Buscar filmes, séries...">
+<button class="search-clear" id="searchClear" title="Limpar busca"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
 </div>
 </header>
+
+<!-- Mobile Menu Drawer -->
+<div class="mobile-drawer-overlay" id="mobileDrawerOverlay"></div>
+<aside class="mobile-drawer" id="mobileDrawer">
+<div class="mobile-drawer-header">
+<span class="mobile-drawer-title">Menu</span>
+<button class="mobile-drawer-close" id="mobileDrawerClose">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+</button>
+</div>
+<div class="mobile-drawer-content" id="mobileDrawerContent"></div>
+</aside>
+
+<div id="heroRoot"></div>
 
 <main class="main-content" id="mainContent">
 <!-- Dynamic content rendered here by app.js -->
